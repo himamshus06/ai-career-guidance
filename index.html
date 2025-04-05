@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Career Guidance System</title>
+</head>
+<body>
+  <h2>Career Guidance System</h2>
+
+  <label for="skillsInput">Enter your skills (comma-separated):</label><br>
+  <input type="text" id="skillsInput" placeholder="e.g., html, python"><br><br>
+
+  <label for="interestsInput">Enter your interests (comma-separated):</label><br>
+  <input type="text" id="interestsInput" placeholder="e.g., ai, front end"><br><br>
+
+  <button onclick="recommendCareer()">Get Career Suggestions</button>
+
+  <h3>Recommended Careers:</h3>
+  <ul id="recommendations"></ul>
+
+  <script>
+
+function stringSimilarity(str1, str2) {
+  str1 = str1.toLowerCase();
+  str2 = str2.toLowerCase();
+
+  const costs = [];
+  for (let i = 0; i <= str1.length; i++) {
+    let lastValue = i;
+    for (let j = 0; j <= str2.length; j++) {
+      if (i === 0) {
+        costs[j] = j;
+      } else {
+        if (j > 0) {
+          let newValue = costs[j - 1];
+          if (str1.charAt(i - 1) !== str2.charAt(j - 1)) {
+            newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+          }
+          costs[j - 1] = lastValue;
+          lastValue = newValue;
+        }
+      }
+    }
+    if (i > 0) costs[str2.length] = lastValue;
+  }
+  const distance = costs[str2.length];
+  const similarity = 1 - distance / Math.max(str1.length, str2.length);
+  return similarity;
+}
+
+    let careerData = [];
+
+    const skillMapping = {
+  "html": "Web_Development_Experience",
+  "css": "Web_Development_Experience",
+  "javascript": "JavaScript",
+  "python": "Python",
+  "java": "Java",
+  "c++": "C++",
+  "frontend": "Web_Development_Experience",
+  "front end": "Web_Development_Experience",
+  "backend": "Database_Management",     // 👈 Add this
+  "back end": "Database_Management",    // 👈 And this
+  "database": "Database_Management",
+  "sql": "Database_Management",
+  "ai": "Artificial_Intelligence",
+  "ml": "Machine_Learning"
+};
+
+
+    // Load the dataset
+    fetch('career_data.json')
+      .then(response => response.json())
+      .then(data => {
+        careerData = data;
+        console.log("✅ Loaded data sample:", data[0]);
+        console.log("📌 All available keys:", Object.keys(data[0]));
+      });
+
+      function recommendCareer() {
+  const userSkills = document.getElementById('skillsInput').value.toLowerCase().split(',').map(s => s.trim());
+  const userInterests = document.getElementById('interestsInput').value.toLowerCase().split(',').map(i => i.trim());
+
+  const scoredCareers = careerData.map(entry => {
+    let score = 0;
+    let matchedSkills = [];
+    let matchedInterests = [];
+
+    // Skill Matching with Fuzzy Score
+    userSkills.forEach(skill => {
+      let bestMatch = null;
+      let bestSim = 0;
+
+      for (const knownSkill in skillMapping) {
+        const sim = stringSimilarity(skill, knownSkill);
+        if (sim > bestSim && sim >= 0.7) {
+          bestSim = sim;
+          bestMatch = skillMapping[knownSkill];
+        }
+      }
+
+      if (bestMatch && entry[bestMatch]) {
+        const value = entry[bestMatch].toString().toLowerCase();
+        if (value !== 'no' && value !== '0') {
+          score += 2;
+          matchedSkills.push(skill);
+        }
+      }
+    });
+
+    // Interest Matching with Fuzzy Score
+    const interestField = (entry.Personal_Interests || "").toLowerCase();
+    const interestWords = interestField.split(/[\s,]+/);
+
+    userInterests.forEach(interest => {
+      interestWords.forEach(word => {
+        const sim = stringSimilarity(interest, word);
+        if (sim >= 0.7) {
+          score += 1;
+          matchedInterests.push(interest);
+        }
+      });
+    });
+
+    return {
+      ...entry,
+      score,
+      matchedSkills,
+      matchedInterests
+    };
+  });
+
+  const topCareers = scoredCareers
+    .filter(c => c.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5); // Top 5
+
+  const list = document.getElementById('recommendations');
+  list.innerHTML = "";
+
+  if (topCareers.length === 0) {
+    list.innerHTML = "<li>No matching careers found. Try different keywords.</li>";
+    return;
+  }
+
+  topCareers.forEach(entry => {
+    const item = document.createElement('li');
+    item.innerHTML = `
+      <strong>${entry.Career_Goals || "Unspecified"}</strong> (Score: ${entry.score})<br>
+      🛠️ Skills Matched: ${entry.matchedSkills.join(', ') || 'None'}<br>
+      ❤️ Interests Matched: ${entry.matchedInterests.join(', ') || 'None'}
+    `;
+    list.appendChild(item);
+  });
+}
+
+  </script>
+</body>
+</html>
